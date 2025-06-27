@@ -4,7 +4,7 @@ SELECT MIN(yearid), MAX(yearid) from teams;
 
 --2. Find the name and height of the shortest player in the database. How many games did he play in? What is the name of the team for which he played?
 --answer: Eddie Gaedel, 43 in, 1 game, St Louis Browns 
-SELECT * from people
+
 SELECT people.namefirst, people.namelast, people.height, appearances.g_all, appearances.teamid, teams.name
 from people
 INNER JOIN appearances
@@ -19,9 +19,13 @@ LIMIT 1
 
 --answer: David Price
 
-SELECT people.namefirst,
+SELECT * from salaries
+WHERE player
+
+SELECT
+		people.namefirst,
 		people.namelast,
-		CAST(CAST(SUM(salaries.salary) AS numeric) AS money),
+		CAST(CAST(SUM(DISTINCT(salaries.salary)) AS numeric) AS money),
 		collegeplaying.schoolid AS school
 from people 
 INNER JOIN salaries
@@ -136,6 +140,8 @@ ORDER BY decade asc
 
 --answer: Chris Owings
 
+--sb stolen bases (successful)
+--cs caught stealing (unsuccessful)
 SELECT 
 		batting.playerid,
 		people.namefirst, 
@@ -150,6 +156,21 @@ WHERE yearid = '2016'
 		AND (sb + cs) >= '20'
 ORDER BY pct_stolen desc 
 
+--from cami (she also added the count of )
+SELECT p.namefirst,
+       p.namelast,
+	   b.playerid,
+	   (SUM(sb) * 100.0) / SUM(sb + cs) AS percentage_sb
+	   --SUM(b.sb) AS stolen_bases
+FROM batting AS b
+JOIN people AS p
+USING (playerid)
+WHERE yearid = 2016
+  AND (sb+cs) >= 20
+GROUP BY p.namefirst,p.namelast,b.playerid
+ORDER BY percentage_sb DESC
+LIMIT 1;
+
 SELECT 
     playerid,
     sb AS stolen,
@@ -162,7 +183,63 @@ ORDER BY pct_stolen DESC;
 
 --7. From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
 
+SELECT yearid, teamid, W
+from teams
+WHERE WSWin = 'N' AND yearid between 1970 and 2016
+ORDER BY w desc
+LIMIT 1
+--largest # of wins for team that did NOT win world series: 116
+
+SELECT yearid, teamid, W
+from teams
+WHERE WSWin = 'Y' AND yearid between 1970 and 2016
+ORDER BY w asc
+-- LIMIT 1
+--smallest # of wins for world series winner: 63
+
+--world series winners 
+SELECT yearid, teamid, W
+from teams
+WHERE WSWin = 'Y' AND yearid between 1970 and 2016
+ORDER BY w asc
+
+--there were 12 years that a team won the most games and the world series (12/47 = 25.53%)...am I supposed to add a query to figure out the percentage? 
+SELECT 
+    yearid,
+    teamid,
+    W,
+    WSWin
+FROM teams
+WHERE yearid BETWEEN 1970 AND 2016
+  AND (yearid, W) IN (
+        SELECT yearid, MAX(W)
+        FROM teams
+        WHERE yearid BETWEEN 1970 AND 2016
+        GROUP BY yearid
+    )
+	AND WSWin = 'Y'
+ORDER BY yearid ASC;
+
+
+--got help from dibran and adell below: 
+SELECT
+	yearid, 
+	teamid,
+	WSWin
+FROM (SELECT yearid, teamid, WSWin,
+		MAX(W) AS most_wins_that_year
+	FROM teams
+	GROUP BY yearid, teamid, WSWin) AS most_wins
+WHERE yearid between 1970 and 2016 AND WSWin = 'Y' 
+ORDER BY yearid desc
+
+--need to make sure outer query and subquery match
+
 --8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
+
+--default is NULL?
+
+--use some logic from 6?
 
 --9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
 SELECT playerid, awardid, lgid 
