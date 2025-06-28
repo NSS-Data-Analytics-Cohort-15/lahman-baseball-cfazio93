@@ -183,14 +183,14 @@ ORDER BY pct_stolen DESC;
 
 --7. From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
 
-SELECT yearid, teamid, W
+SELECT yearid, teamid, W AS most_wins_but_not_WS
 from teams
 WHERE WSWin = 'N' AND yearid between 1970 and 2016
 ORDER BY w desc
 LIMIT 1
 --largest # of wins for team that did NOT win world series: 116
 
-SELECT yearid, teamid, W
+SELECT yearid, teamid AS world_series_champ, W as total_wins
 from teams
 WHERE WSWin = 'Y' AND yearid between 1970 and 2016
 ORDER BY w asc
@@ -203,7 +203,7 @@ from teams
 WHERE WSWin = 'Y' AND yearid between 1970 and 2016
 ORDER BY w asc
 
---there were 12 years that a team won the most games and the world series (12/47 = 25.53%)...am I supposed to add a query to figure out the percentage? 
+--there were 12 years that a team won the most games and the world series (12/47 = 26%)...am I supposed to add a query to figure out the percentage? (2nd query has percentage)
 SELECT 
     yearid,
     teamid,
@@ -220,12 +220,38 @@ WHERE yearid BETWEEN 1970 AND 2016
 	AND WSWin = 'Y'
 ORDER BY yearid ASC;
 
+WITH temptable AS (
+SELECT DISTINCT
+    yearid,
+    --teamid,
+    W,
+    WSWin
+FROM teams
+WHERE yearid BETWEEN 1970 AND 2016
+AND yearid != 1981
+  AND (yearid, W) IN (
+        SELECT yearid, MAX(W)
+        FROM teams
+        WHERE yearid BETWEEN 1970 AND 2016
+		AND yearid != 1981
+        GROUP BY yearid
+    )
+	--AND WSWin = 'Y'
+ORDER BY yearid ASC)
+SELECT 
+	COUNT(CASE WHEN WSWin = 'Y' THEN 1 ELSE NULL
+	END) * 1.0 
+/count(distinct(yearid))
+FROM temptable
 
---got help from dibran and adell below: 
+--had to distinct bc some teams tied on # of wins
+
+--got help from dibran and adell below but need to filter for years
 SELECT
 	yearid, 
 	teamid,
-	WSWin
+	WSWin, 
+	most_wins_that_year
 FROM (SELECT yearid, teamid, WSWin,
 		MAX(W) AS most_wins_that_year
 	FROM teams
@@ -233,18 +259,93 @@ FROM (SELECT yearid, teamid, WSWin,
 WHERE yearid between 1970 and 2016 AND WSWin = 'Y' 
 ORDER BY yearid desc
 
+SELECT
+	yearid, 
+	teamid,
+	WSWin, 
+	most_wins_that_year
+FROM (SELECT yearid, teamid, WSWin,
+		MAX(W) AS most_wins_that_year
+	FROM teams
+	GROUP BY yearid, teamid, WSWin) AS most_wins
+WHERE yearid between 1970 and 2016 AND WSWin = 'Y' 
+ORDER BY yearid desc
+
+---from marvin below: 
+
+WITH highest_wins_by_season AS ( ---CTE to create table with year, max # of wins, max win season flag
+SELECT yearid,
+MAX(W) as W,
+'max win season' as max_win_season
+FROM teams as t2
+where yearid >= 1970
+GROUP BY yearid
+ORDER BY yearid)
+
+SELECT
+	teams.yearid, 
+	teams.teamid,
+	teams.WSWin, 
+	teams.w
+FROM teams
+INNER JOIN highest_wins_by_season
+ON teams.yearid = highest_wins_by_season.yearid
+WHERE teams.WSWin = 'Y'
+ORDER BY yearid desc
+
 --need to make sure outer query and subquery match
 
 --8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
+
+--largest attendance: 
+SELECT 
+	team,
+	park,
+	ROUND(attendance * 1.0 / games, 2) AS avg_attendance
+from homegames
+WHERE year = '2016' AND games >= '10'
+ORDER BY avg_attendance desc
+LIMIT 5
+
+--lowest attendance: 
+SELECT 
+	team,
+	park,
+	ROUND(attendance * 1.0 / games, 2) AS avg_attendance
+from homegames
+WHERE year = '2016' AND games >= '10'
+ORDER BY avg_attendance asc
+LIMIT 5
 
 --default is NULL?
 
 --use some logic from 6?
 
 --9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
-SELECT playerid, awardid, lgid 
+WITH AL_mgr_of_year AS 
+(SELECT playerid, awardid, lgid
 from awardsmanagers
-WHERE awardid = 'TSN Manager of the Year'
-GROUP BY playerid, awardid, lgid
+WHERE awardid = 'TSN Manager of the Year' AND lgid = 'AL'
+GROUP BY playerid, awardid, lgid)
+
+SELECT 
+	--AL_mgr_of_year.playerid,
+	awardsmanagers.playerid, 
+	people.namefirst, 
+	people.namelast,
+	awardsmanagers.awardid, 
+	awardsmanagers.lgid 
+from awardsmanagers
+INNER JOIN AL_mgr_of_year
+ON awardsmanagers.playerid = AL_mgr_of_year.playerid
+INNER JOIN people
+ON awardsmanagers.playerid = people.playerid
+WHERE awardsmanagers.awardid = 'TSN Manager of the Year' AND awardsmanagers.lgid = 'NL' --OR AL_mgr_of_year.lgid = 'AL')
+GROUP BY awardsmanagers.playerid, awardsmanagers.awardid, awardsmanagers.lgid, people.namefirst, people.namelast, AL_mgr_of_year.playerid
+
+SELECT * from managershalf
+
+SELECT playerid, lgid, awardid, yearid from awardsmanagers
+WHERE playerid = 'baylodo01' AND awardid = 'TSN Manager of the Year'
 
 --10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
