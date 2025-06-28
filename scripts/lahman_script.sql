@@ -322,6 +322,8 @@ LIMIT 5
 --use some logic from 6?
 
 --9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
+--first, last, teams, year (should get 6 rows)
+--IN for list (NL, AL)
 WITH AL_mgr_of_year AS 
 (SELECT playerid, awardid, lgid
 from awardsmanagers
@@ -333,19 +335,99 @@ SELECT
 	awardsmanagers.playerid, 
 	people.namefirst, 
 	people.namelast,
-	awardsmanagers.awardid, 
-	awardsmanagers.lgid 
+	awardsmanagers.awardid,
+	awardsmanagers.yearid,
+	awardsmanagers.lgid,  
+	teams.teamid
 from awardsmanagers
 INNER JOIN AL_mgr_of_year
 ON awardsmanagers.playerid = AL_mgr_of_year.playerid
 INNER JOIN people
 ON awardsmanagers.playerid = people.playerid
+LEFT JOIN managershalf
+ON awardsmanagers.playerid = managershalf.playerid
+LEFT JOIN teams
+ON managershalf.teamid = teams.teamid
 WHERE awardsmanagers.awardid = 'TSN Manager of the Year' AND awardsmanagers.lgid = 'NL' --OR AL_mgr_of_year.lgid = 'AL')
-GROUP BY awardsmanagers.playerid, awardsmanagers.awardid, awardsmanagers.lgid, people.namefirst, people.namelast, AL_mgr_of_year.playerid
+GROUP BY awardsmanagers.playerid, awardsmanagers.awardid, awardsmanagers.lgid, people.namefirst, people.namelast, teams.teamid, awardsmanagers.yearid --AL_mgr_of_year.playerid
+ORDER BY people.namelast asc
+------duplicate below
 
-SELECT * from managershalf
+SELECT * from awardsmanagers
 
-SELECT playerid, lgid, awardid, yearid from awardsmanagers
-WHERE playerid = 'baylodo01' AND awardid = 'TSN Manager of the Year'
+WITH temptable2 AS 
+(WITH bothleagues AS 
+(SELECT 
+	playerid, 
+	yearid
+FROM awardsmanagers
+WHERE playerid IN ('johnsda02', 'leylaji99') AND awardid = 'TSN Manager of the Year'
+GROUP BY playerid, yearid)
+
+(WITH temptable AS
+(WITH AL_mgr_of_year AS 
+(SELECT playerid, awardid, lgid
+from awardsmanagers
+WHERE awardid = 'TSN Manager of the Year' AND lgid = 'AL'
+GROUP BY playerid, awardid, lgid)
+
+SELECT 
+	--AL_mgr_of_year.playerid,
+	awardsmanagers.playerid, 
+	people.namefirst, 
+	people.namelast,
+	awardsmanagers.awardid,
+	bothleagues.yearid, 
+	teams.teamid
+from awardsmanagers
+INNER JOIN AL_mgr_of_year
+ON awardsmanagers.playerid = AL_mgr_of_year.playerid
+INNER JOIN people
+ON awardsmanagers.playerid = people.playerid
+INNER JOIN managershalf as mh
+ON awardsmanagers.playerid = managershalf.playerid
+INNER JOIN teams as t
+ON managershalf.teamid = teams.teamid
+WHERE awardsmanagers.awardid = 'TSN Manager of the Year' AND awardsmanagers.lgid = 'NL' --OR AL_mgr_of_year.lgid = 'AL')
+GROUP BY awardsmanagers.playerid, awardsmanagers.awardid, awardsmanagers.lgid, people.namefirst, people.namelast, teams.teamid, awardsmanagers.yearid --AL_mgr_of_year.playerid
+ORDER BY people.namelast asc))
+
+--CTE for just these two coaches 
+WITH bothleagues AS 
+(SELECT 
+	playerid, 
+	yearid
+FROM awardsmanagers
+WHERE playerid IN ('johnsda02', 'leylaji99') AND awardid = 'TSN Manager of the Year'
+GROUP BY playerid, yearid),
+
+WITH AL_mgr_of_year AS 
+(SELECT playerid, awardid, lgid
+from awardsmanagers
+WHERE awardid = 'TSN Manager of the Year' AND lgid = 'AL'
+GROUP BY playerid, awardid, lgid)
+
+SELECT 
+	awardsmanagers.playerid, 
+	people.namefirst, 
+	people.namelast,
+	awardsmanagers.awardid,
+	t.teamid
+from awardsmanagers
+INNER JOIN AL_mgr_of_year
+ON awardsmanagers.playerid = AL_mgr_of_year.playerid
+INNER JOIN people
+ON awardsmanagers.playerid = people.playerid
+INNER JOIN managershalf as mh
+ON awardsmanagers.playerid = mh.playerid
+INNER JOIN teams as t
+ON mh.teamid = t.teamid
+WHERE awardsmanagers.awardid = 'TSN Manager of the Year' AND awardsmanagers.lgid = 'NL' --OR AL_mgr_of_year.lgid = 'AL')
+GROUP BY awardsmanagers.playerid, awardsmanagers.awardid, awardsmanagers.lgid, people.namefirst, people.namelast, t.teamid, awardsmanagers.yearid --AL_mgr_of_year.playerid
+ORDER BY people.namelast asc
+
+
+
+
 
 --10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
