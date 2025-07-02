@@ -324,6 +324,23 @@ LIMIT 5
 --9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
 --first, last, teams, year (should get 6 rows)
 --IN for list (NL, AL)
+
+--from dibran
+
+select playerid from awardsmanagers
+WHERE awardid = 'TSN Manager of the Year'
+
+select * from people
+where playerid IN ('johnsda02', 'leylaji99')
+--firstname
+--lastname
+
+select *
+from awardsmanagers
+where playerid IN ('johnsda02', 'leylaji99') and awardid IN ('TSN Manager of the Year')
+--join to people 
+
+--my work 
 WITH AL_mgr_of_year AS 
 (SELECT playerid, awardid, lgid
 from awardsmanagers
@@ -351,48 +368,32 @@ ON managershalf.teamid = teams.teamid
 WHERE awardsmanagers.awardid = 'TSN Manager of the Year' AND awardsmanagers.lgid = 'NL' --OR AL_mgr_of_year.lgid = 'AL')
 GROUP BY awardsmanagers.playerid, awardsmanagers.awardid, awardsmanagers.lgid, people.namefirst, people.namelast, teams.teamid, awardsmanagers.yearid --AL_mgr_of_year.playerid
 ORDER BY people.namelast asc
-------duplicate below
 
-SELECT * from awardsmanagers
+--dibran/krithika:
 
-WITH temptable2 AS 
-(WITH bothleagues AS 
-(SELECT 
-	playerid, 
-	yearid
-FROM awardsmanagers
-WHERE playerid IN ('johnsda02', 'leylaji99') AND awardid = 'TSN Manager of the Year'
-GROUP BY playerid, yearid)
 
-(WITH temptable AS
-(WITH AL_mgr_of_year AS 
-(SELECT playerid, awardid, lgid
-from awardsmanagers
-WHERE awardid = 'TSN Manager of the Year' AND lgid = 'AL'
-GROUP BY playerid, awardid, lgid)
-
-SELECT 
-	--AL_mgr_of_year.playerid,
-	awardsmanagers.playerid, 
+with award as 
+(
+select
+	distinct playerid
+	from awardsmanagers
+	where awardid = 'TSN Manager of the Year' and lgid IN ('AL', 'NL')
+	group by playerid HAVING count(distinct lgid)>=2
+)
+select
+	distinct awardsmanagers.yearid, 
+	people.playerid, 
+	teams.name,
 	people.namefirst, 
-	people.namelast,
-	awardsmanagers.awardid,
-	bothleagues.yearid, 
-	teams.teamid
-from awardsmanagers
-INNER JOIN AL_mgr_of_year
-ON awardsmanagers.playerid = AL_mgr_of_year.playerid
-INNER JOIN people
-ON awardsmanagers.playerid = people.playerid
-INNER JOIN managershalf as mh
-ON awardsmanagers.playerid = managershalf.playerid
-INNER JOIN teams as t
-ON managershalf.teamid = teams.teamid
-WHERE awardsmanagers.awardid = 'TSN Manager of the Year' AND awardsmanagers.lgid = 'NL' --OR AL_mgr_of_year.lgid = 'AL')
-GROUP BY awardsmanagers.playerid, awardsmanagers.awardid, awardsmanagers.lgid, people.namefirst, people.namelast, teams.teamid, awardsmanagers.yearid --AL_mgr_of_year.playerid
-ORDER BY people.namelast asc))
+	people.namelast
+FROM awardsmanagers
+JOIN award ON awardsmanagers.playerid = award.playerid
+join people ON award.playerid = people.playerid
+join managers on people.playerid = managers.playerid and awardsmanagers.yearid = managers.yearid
+join teams on managers.teamid = teams.teamid and managers.yearid = teams.yearid
 
---CTE for just these two coaches 
+
+--CTE for just these two coaches ?
 WITH bothleagues AS 
 (SELECT 
 	playerid, 
@@ -401,11 +402,11 @@ FROM awardsmanagers
 WHERE playerid IN ('johnsda02', 'leylaji99') AND awardid = 'TSN Manager of the Year'
 GROUP BY playerid, yearid),
 
-WITH AL_mgr_of_year AS 
-(SELECT playerid, awardid, lgid
-from awardsmanagers
-WHERE awardid = 'TSN Manager of the Year' AND lgid = 'AL'
-GROUP BY playerid, awardid, lgid)
+-- WITH AL_mgr_of_year AS 
+-- (SELECT playerid, awardid, lgid
+-- from awardsmanagers
+-- WHERE awardid = 'TSN Manager of the Year' AND lgid = 'AL'
+-- GROUP BY playerid, awardid, lgid)
 
 SELECT 
 	awardsmanagers.playerid, 
@@ -427,7 +428,129 @@ GROUP BY awardsmanagers.playerid, awardsmanagers.awardid, awardsmanagers.lgid, p
 ORDER BY people.namelast asc
 
 
+--10. Find all players who hit their career highest number of home runs in 2016. 
+--		Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. 
+--		Report the players' first and last names and the number of home runs they hit in 2016.
+
+--below to check max hr
+-- select playerid from people
+-- where namefirst = 'Robinson' and namelast = 'Cano'
+-- "canoro01"
+--max hr for Cano 39...same as in query 
+
+select distinct (playerid), hr
+from batting
+where yearid = '2016' and hr > 0
+ORDER BY hr desc
+--yearid 2016
+--playerid
+--hr
+
+--trying other methods...got help from dibran: 
+
+SELECT 
+    b.playerid AS player,
+    MAX(b.hr) AS max_hr, 
+	CASE WHEN
+		MAX(CASE WHEN b.yearid = 2016 THEN b.hr ELSE null end) = MAX(b.hr)
+		THEN 'y'
+		ELSE 'n'
+	END AS max_year
+FROM batting as b
+INNER JOIN (select playerid from batting group by playerid having count (distinct yearid) >= 10) as c
+USING (playerid) --only joining on players who played 10+ years
+WHERE b.hr > 0
+group by playerid
+having
+	max(case when yearid = 2016 then hr else null end) = max(hr) 
+--for above...would need to join to get names
 
 
 
---10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
+	
+GROUP BY 
+    playerid
+ORDER BY 
+    max_hr DESC;
+
+select playerid, max(hr)
+from batting
+group by playerid
+order by max desc
+--max hr for each player
+
+select count(distinct yearid) as years, playerid
+from batting
+group by playerid
+order by years desc
+--how many years each player played
+
+select max(hr)
+from batting
+where playerid = 'canoro01'
+
+
+--from cami:
+with playeryears AS
+(
+	SELECT playerid, COUNT(DISTINCT yearid) AS years_played
+	from batting
+	group by playerid
+), 
+
+hr_2016 AS
+(select playerid, hr AS hr_2016
+from batting
+where yearid = 2016 and hr >0
+),
+
+max_career_hr AS
+(
+	select playerid, max (HR) as career_high_hr
+	from batting
+	group by playerid
+)
+
+select p.namefirst, p.namelast, h.hr_2016
+from hr_2016 as h
+join max_career_hr as m
+	on h.playerid = m.playerid
+	and h.hr_2016 = m.career_high_hr
+join playeryears as py
+	on h.playerid = py.playerid
+	and py.years_played >= 10
+join people as p
+	on p.playerid = h.playerid
+
+----duplicate below: 
+
+-- 	with playeryears AS
+-- (
+-- 	SELECT playerid, COUNT(DISTINCT yearid) AS years_played
+-- 	from batting
+-- 	group by playerid
+-- ), 
+
+-- hr_2016 AS
+-- (select playerid, hr AS hr_2016
+-- from batting
+-- where yearid = 2016 and hr >0
+-- ),
+
+-- max_career_hr AS
+-- (
+-- 	select playerid, max (HR) as career_high_hr
+-- 	from batting
+-- 	group by playerid
+-- )
+
+-- select p.namefirst, p.namelast, h.hr_2016
+-- from hr_2016 as h
+-- join max_career_hr as m
+-- 	on h.playerid = m.playerid
+-- 	and h.hr_2016 = m.career_high_hr
+-- join playeryears as py
+-- 	on h.playerid = py.playerid
+-- 	and py.years_played >= 10
+-- join people as p
+-- 	on p.playerid = h.playerid
